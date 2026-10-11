@@ -1,0 +1,972 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- Module 1 cap-quote PROTOTYPE. Fictional in-memory data only. This CSP blocks every network
+     request (fetch/XHR/WebSocket, external scripts, styles, images, fonts, form posts), so the
+     page cannot write anywhere outside the browser tab. It uses no localStorage/sessionStorage/
+     IndexedDB/cookies: refreshing resets the sample. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; form-action 'none'; base-uri 'none'">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="data:,">
+<title>Cap Quote Prototype — DEMO</title>
+<style>
+/* Palette copied from public/app.css (Field Dispatch shared tokens) so the sample looks familiar.
+   The prototype does not load or change any live app file. */
+:root {
+  --brand:#103B56; --brand-mid:#1A5A7A; --brand-lite:#E8F1F6;
+  --accent:#2196A0; --green:#27AE60; --amber:#F59E0B; --red:#E74C3C;
+  --text:#1A2A35; --muted:#5B7888; --border:#DDE6EC; --bg:#FFFFFF; --surface:#F4F8FB;
+  --success-bg:#D1FAE5; --success-text:#065F46;
+  --warning-bg:#FEF3C7; --warning-text:#92400E;
+  --danger-bg:#FEE2E2; --danger-text:#991B1B;
+  --info-bg:#DBEAFE; --info-text:#1E40AF;
+  --radius-sm:6px; --radius-md:10px; --radius-lg:14px;
+  --shadow-sm:0 1px 2px rgba(16,59,86,0.06); --shadow-md:0 2px 8px rgba(16,59,86,0.10);
+  --tap:48px;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin:0; font:17px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color:var(--text); background:var(--surface); }
+button, input, select, textarea { font: inherit; color: inherit; }
+h1,h2,h3 { margin:0; line-height:1.25; }
+[hidden] { display:none !important; }
+
+/* ---- Demo banner (always visible) ---- */
+.demo-bar { position:sticky; top:0; z-index:30; background:repeating-linear-gradient(135deg,#7A1F1F 0 14px,#8E2626 14px 28px); color:#fff;
+  padding:10px max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left)); padding-top:calc(10px + env(safe-area-inset-top));
+  display:flex; flex-wrap:wrap; align-items:center; gap:8px 16px; }
+.demo-bar strong { font-size:18px; letter-spacing:.04em; }
+.demo-bar .demo-sub { font-size:14px; opacity:.95; flex:1 1 280px; }
+.demo-bar .bar-actions { display:flex; gap:8px; }
+.btn-bar { min-height:44px; padding:0 14px; border-radius:var(--radius-sm); border:1px solid rgba(255,255,255,.7); background:rgba(255,255,255,.12); color:#fff; font-weight:600; cursor:pointer; }
+.btn-bar:active { background:rgba(255,255,255,.28); }
+
+/* ---- App header + stepper ---- */
+.app-head { background:var(--brand); color:#fff; padding:12px 16px 0; }
+.app-head .titles { max-width:1180px; margin:0 auto; display:flex; flex-wrap:wrap; gap:4px 16px; align-items:baseline; }
+.app-head h1 { font-size:20px; }
+.app-head .company { opacity:.8; font-size:15px; }
+.stepper { max-width:1180px; margin:10px auto 0; display:flex; gap:4px; overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+.stepper::-webkit-scrollbar { display:none; }
+.step-tab { flex:1 0 auto; min-height:var(--tap); display:flex; align-items:center; gap:8px; padding:8px 14px; border:0; border-radius:var(--radius-md) var(--radius-md) 0 0;
+  background:rgba(255,255,255,.10); color:#fff; cursor:pointer; text-align:left; white-space:nowrap; }
+.step-tab[aria-current="step"] { background:var(--surface); color:var(--brand); font-weight:700; }
+.step-num { display:inline-grid; place-items:center; width:28px; height:28px; border-radius:50%; background:rgba(255,255,255,.2); font-weight:700; font-size:15px; flex:none; }
+.step-tab[aria-current="step"] .step-num { background:var(--brand); color:#fff; }
+.step-flag { font-size:13px; font-weight:700; padding:1px 7px; border-radius:999px; }
+.step-flag.ok { background:var(--success-bg); color:var(--success-text); }
+.step-flag.bad { background:var(--warning-bg); color:var(--warning-text); }
+
+/* ---- Main ---- */
+main { max-width:1180px; margin:0 auto; padding:20px 16px 120px; }
+.step-title { display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 14px; margin-bottom:14px; }
+.step-title h2 { font-size:26px; color:var(--brand); }
+.step-title .hint { color:var(--muted); }
+.card { background:var(--bg); border:1px solid var(--border); border-radius:var(--radius-lg); box-shadow:var(--shadow-sm); padding:18px; margin-bottom:16px; }
+.card h3 { font-size:19px; color:var(--brand); margin-bottom:12px; }
+.card-head { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:12px; }
+.card-head h3 { margin:0; flex:1 1 auto; }
+.grid { display:grid; gap:14px; }
+.g2 { grid-template-columns:repeat(2, minmax(0,1fr)); }
+.g3 { grid-template-columns:repeat(3, minmax(0,1fr)); }
+.g4 { grid-template-columns:repeat(4, minmax(0,1fr)); }
+.span2 { grid-column:span 2; }
+.two-col { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:16px; align-items:start; }
+@media (max-width: 900px) { .two-col { grid-template-columns:1fr; } .g4 { grid-template-columns:repeat(2, minmax(0,1fr)); } }
+@media (max-width: 700px) { .g3 { grid-template-columns:repeat(2, minmax(0,1fr)); } }
+@media (max-width: 480px) { .g2, .g3, .g4 { grid-template-columns:1fr; } .span2 { grid-column:auto; } body { font-size:16px; } }
+@media (max-width: 600px) {
+  .demo-bar { padding-top:calc(6px + env(safe-area-inset-top)); padding-bottom:6px; gap:4px 10px; }
+  .demo-bar strong { font-size:15px; flex:1 1 auto; }
+  .demo-bar .demo-sub { font-size:12px; flex-basis:100%; order:3; }
+  .btn-bar { min-height:40px; padding:0 10px; font-size:14px; }
+  .actionbar .btn { min-width:96px; }
+  .actionbar .where .long { display:none; }
+}
+
+.field label, .field .label { display:block; font-weight:600; font-size:15px; margin-bottom:6px; }
+.field .opt { font-weight:400; color:var(--muted); }
+.input, select.input, textarea.input { width:100%; min-height:var(--tap); padding:10px 12px; border:1.5px solid #B9CBD6; border-radius:var(--radius-sm); background:#fff; font-size:17px; }
+textarea.input { min-height:84px; resize:vertical; }
+.input:focus { outline:3px solid rgba(33,150,160,.35); border-color:var(--accent); }
+.input[aria-invalid="true"] { border-color:var(--red); background:#FFF8F7; }
+.input[readonly] { background:var(--surface); color:var(--muted); }
+.with-unit { display:flex; align-items:stretch; }
+.with-unit .input { border-top-right-radius:0; border-bottom-right-radius:0; }
+.with-unit .unit { display:grid; place-items:center; padding:0 12px; border:1.5px solid #B9CBD6; border-left:0; border-radius:0 var(--radius-sm) var(--radius-sm) 0; background:var(--surface); color:var(--muted); font-weight:600; min-width:48px; }
+.with-prefix { display:flex; align-items:stretch; }
+.with-prefix .pre { display:grid; place-items:center; padding:0 10px; border:1.5px solid #B9CBD6; border-right:0; border-radius:var(--radius-sm) 0 0 var(--radius-sm); background:var(--surface); color:var(--muted); font-weight:600; }
+.with-prefix .input { border-top-left-radius:0; border-bottom-left-radius:0; }
+.err { color:var(--danger-text); font-size:14px; font-weight:600; margin-top:5px; min-height:0; }
+.err:empty { display:none; }
+.help { color:var(--muted); font-size:14px; margin-top:5px; }
+
+.btn { min-height:var(--tap); padding:0 18px; border-radius:var(--radius-sm); border:1.5px solid var(--brand); background:#fff; color:var(--brand); font-weight:700; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:6px; text-decoration:none; }
+.btn:active { transform:translateY(1px); }
+.btn.primary { background:var(--brand); color:#fff; }
+.btn.danger { border-color:var(--red); color:var(--danger-text); }
+.btn.quiet { border-color:var(--border); color:var(--brand-mid); font-weight:600; }
+.btn[disabled] { opacity:.45; cursor:not-allowed; }
+.btn.small { min-height:40px; padding:0 12px; font-size:15px; }
+.row-actions { display:flex; flex-wrap:wrap; gap:10px; }
+
+.seg { display:flex; flex-wrap:wrap; gap:8px; }
+.seg button { min-height:var(--tap); min-width:64px; padding:0 16px; border-radius:var(--radius-sm); border:1.5px solid #B9CBD6; background:#fff; cursor:pointer; font-weight:600; }
+.seg button[aria-pressed="true"] { background:var(--brand); border-color:var(--brand); color:#fff; }
+.seg.invalid button { border-color:var(--red); }
+
+.check { display:flex; gap:12px; align-items:flex-start; padding:12px 14px; border:1.5px solid #B9CBD6; border-radius:var(--radius-md); background:#fff; cursor:pointer; min-height:var(--tap); }
+.check input { width:28px; height:28px; margin:0; flex:none; accent-color:var(--green); }
+.check.on { border-color:var(--green); background:var(--success-bg); }
+.check.invalid { border-color:var(--red); }
+
+.note { border-radius:var(--radius-md); padding:12px 14px; margin-bottom:14px; font-size:15px; border:1px solid transparent; }
+.note strong { display:block; margin-bottom:2px; }
+.note.warn { background:var(--warning-bg); color:var(--warning-text); border-color:#F5D58A; }
+.note.info { background:var(--info-bg); color:var(--info-text); border-color:#B9CFF5; }
+.note.bad { background:var(--danger-bg); color:var(--danger-text); border-color:#F6B7B0; }
+.note.good { background:var(--success-bg); color:var(--success-text); border-color:#9FDDBF; }
+.pill { display:inline-block; font-size:13px; font-weight:700; padding:2px 9px; border-radius:999px; background:var(--neutral-bg, #DDE6EC); color:var(--brand-mid); vertical-align:middle; }
+.pill.sample { background:var(--warning-bg); color:var(--warning-text); }
+.pill.pending { background:var(--info-bg); color:var(--info-text); }
+.pill.id { background:var(--brand-lite); color:var(--brand); font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+.line-card { border-left:6px solid var(--accent); }
+.line-meta { color:var(--muted); font-size:15px; }
+.money { font-variant-numeric:tabular-nums; }
+.line-total { font-size:20px; font-weight:800; color:var(--brand); text-align:right; }
+.totals { max-width:460px; margin-left:auto; }
+.totals .t-row { display:flex; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid var(--border); }
+.totals .t-row.grand { font-size:22px; font-weight:800; color:var(--brand); border-bottom:0; }
+.totals .t-row .muted { color:var(--muted); font-size:15px; }
+
+.issue-list { list-style:none; margin:0; padding:0; }
+.issue-list li { display:flex; align-items:center; gap:12px; padding:10px 0; border-top:1px solid rgba(0,0,0,.08); }
+.issue-list li:first-child { border-top:0; }
+.issue-list .txt { flex:1; }
+
+.review-dl { display:grid; grid-template-columns:max-content 1fr; gap:6px 16px; margin:0; }
+.review-dl dt { color:var(--muted); font-weight:600; }
+.review-dl dd { margin:0; }
+.review-line { border-top:1px solid var(--border); padding:12px 0; }
+.review-line:first-of-type { border-top:0; }
+
+.choice-tile { border:1.5px dashed #9DB4C2; border-radius:var(--radius-md); padding:14px; background:var(--surface); color:var(--muted); }
+.choice-tile b { color:var(--text); }
+
+/* ---- Bottom action bar ---- */
+.actionbar { position:fixed; left:0; right:0; bottom:0; z-index:20; background:rgba(255,255,255,.97); border-top:1px solid var(--border); box-shadow:0 -2px 10px rgba(16,59,86,.08);
+  padding:10px max(16px, env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+.actionbar .inner { max-width:1180px; margin:0 auto; display:flex; align-items:center; gap:12px; }
+.actionbar .where { flex:1; text-align:center; color:var(--muted); font-size:15px; }
+.actionbar .btn { min-width:120px; min-height:52px; }
+
+/* ---- Modal ---- */
+.modal-back { position:fixed; inset:0; z-index:50; background:rgba(16,30,40,.5); display:grid; place-items:center; padding:16px; }
+.modal { background:#fff; border-radius:var(--radius-lg); box-shadow:0 10px 40px rgba(0,0,0,.3); width:min(720px, 100%); max-height:calc(100vh - 32px); display:flex; flex-direction:column; }
+.modal header { padding:16px 18px; border-bottom:1px solid var(--border); }
+.modal header h2 { font-size:21px; color:var(--brand); }
+.modal .body { padding:16px 18px; overflow:auto; }
+.modal footer { padding:12px 18px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:10px; flex-wrap:wrap; }
+.cat-row { display:grid; grid-template-columns:1.2fr 2fr 1fr auto auto; gap:8px; align-items:center; padding:8px 0; border-bottom:1px solid var(--border); }
+.cat-row.head { font-weight:700; font-size:14px; color:var(--muted); }
+@media (max-width: 640px) { .cat-row { grid-template-columns:1fr 1fr; } .cat-row.head { display:none; } }
+.cat-row label.mini { display:flex; align-items:center; gap:6px; font-size:14px; }
+.cat-row label.mini input { width:24px; height:24px; }
+.table-wrap { overflow-x:auto; }
+
+/* ---- Quote document ---- */
+.preview-tools { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:14px; }
+.quote-doc { background:#fff; border:1px solid var(--border); border-radius:var(--radius-md); box-shadow:var(--shadow-md); padding:32px; position:relative; overflow:hidden; font-size:15px; }
+.quote-doc .wm { position:absolute; inset:0; display:grid; place-items:center; pointer-events:none; }
+.quote-doc .wm span { transform:rotate(-28deg); font-size:110px; font-weight:900; color:rgba(180,40,40,.07); letter-spacing:.08em; white-space:nowrap; }
+.doc-demo { border:2px solid #8E2626; color:#8E2626; background:#FFF1F1; font-weight:800; text-align:center; padding:8px; border-radius:6px; letter-spacing:.05em; margin-bottom:20px; }
+.doc-head { display:flex; justify-content:space-between; gap:20px; flex-wrap:wrap; border-bottom:3px solid var(--brand); padding-bottom:14px; margin-bottom:18px; }
+.doc-head .co { font-size:26px; font-weight:800; color:var(--brand); }
+.doc-head .meta { text-align:right; color:var(--muted); }
+.doc-head .meta b { color:var(--text); font-size:20px; }
+.doc-parties { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:20px; }
+.doc-parties h4, .doc-sec h4 { margin:0 0 4px; font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
+.doc-table { width:100%; border-collapse:collapse; margin-bottom:16px; }
+.doc-table th { text-align:left; font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); border-bottom:2px solid var(--border); padding:8px 6px; }
+.doc-table td { border-bottom:1px solid var(--border); padding:10px 6px; vertical-align:top; }
+.doc-table .num { text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.doc-table .spec { color:var(--muted); font-size:14px; margin-top:3px; }
+.doc-sec { margin-top:18px; padding-top:12px; border-top:1px solid var(--border); }
+.doc-foot { margin-top:24px; font-size:13px; color:var(--muted); text-align:center; }
+.print-only { display:none; }
+@media (max-width: 600px) { .quote-doc { padding:16px; } .doc-parties { grid-template-columns:1fr; } .quote-doc .wm span { font-size:60px; } }
+
+/* ---- Print: only the quote document plus repeated demo warnings ---- */
+@media print {
+  @page { margin:16mm 14mm 18mm; }
+  body { background:#fff; font-size:12pt; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .demo-bar, .app-head, .actionbar, .preview-tools, .step-title, .screen-only, .modal-back { display:none !important; }
+  main { padding:0; max-width:none; }
+  .quote-doc { border:0; box-shadow:none; padding:0; overflow:visible; }
+  .quote-doc .wm { position:fixed; }
+  .print-only { display:block; }
+  .print-demo-foot { position:fixed; bottom:0; left:0; right:0; text-align:center; font-size:9pt; font-weight:800; color:#8E2626; letter-spacing:.05em; }
+  .doc-table tr, .totals, .doc-sec { break-inside:avoid; }
+  body:not(.on-preview) main > * { display:none !important; }
+  body:not(.on-preview) main::before { content:"DEMO — NOT FOR CUSTOMER USE. Open step 6 (Quote preview) to print the sample quote."; display:block; font-weight:800; color:#8E2626; }
+}
+</style>
+</head>
+<body>
+
+<div class="demo-bar" role="banner">
+  <strong>DEMO — NOT FOR CUSTOMER USE</strong>
+  <span class="demo-sub">Fictional sample data. Nothing is saved, sent or charged. <b>Refreshing the page resets the sample.</b></span>
+  <span class="bar-actions">
+    <button class="btn-bar" type="button" data-act="settings">Demo settings</button>
+    <button class="btn-bar" type="button" data-act="reset">Reset sample</button>
+  </span>
+</div>
+
+<header class="app-head">
+  <div class="titles">
+    <h1>Cap Quote — Module 1 prototype</h1>
+    <span class="company" id="hdr-company"></span>
+  </div>
+  <nav class="stepper" id="stepper" aria-label="Quote steps"></nav>
+</header>
+
+<main id="main" tabindex="-1"></main>
+
+<div class="actionbar">
+  <div class="inner">
+    <button class="btn" type="button" id="btn-back" data-act="back">‹ Back</button>
+    <span class="where" id="where"></span>
+    <button class="btn primary" type="button" id="btn-next" data-act="next">Next ›</button>
+  </div>
+</div>
+
+<div id="modal-root"></div>
+
+<script>
+'use strict';
+/* =====================================================================================
+   Module 1 cap-quote prototype. All data is fictional and lives only in the `state` object
+   below; nothing is persisted or transmitted. Real business data will live in GHL/Weblink.
+   ===================================================================================== */
+
+const STEPS = [
+  { key: 'customer', label: 'Customer & property' },
+  { key: 'measure',  label: 'Cap measurements' },
+  { key: 'pricing',  label: 'Products & pricing' },
+  { key: 'review',   label: 'Review' },
+  { key: 'contract', label: 'Contract & deposit' },
+  { key: 'preview',  label: 'Quote preview' },
+];
+
+// Configurable demo settings (Demo settings dialog). Every value is a placeholder pending Sean's input.
+function defaultSettings() {
+  return {
+    companyName: 'Sample Chimney Co.',   // fictional; configurable in Demo settings
+    units: ['in', 'cm'],
+    defaultUnit: 'in',
+    depositExamplePercent: '20',
+    materials: ['Stainless steel', 'Galvanized steel', 'Copper'],
+    finishes: ['Mill / unpainted', 'Black powder coat', 'Bronze powder coat'],
+    // Sample part numbers and placeholder prices. `measured` = the line needs cap measurements.
+    catalog: [
+      { pn: 'DEMO-CAP-SF',   description: 'Single-flue chimney cap',            price: '189.00', measured: true },
+      { pn: 'DEMO-CAP-MF',   description: 'Multi-flue chimney cap',             price: '349.00', measured: true },
+      { pn: 'DEMO-CHASE',    description: 'Chase cover',                        price: '425.00', measured: true },
+      { pn: 'DEMO-INSTALL',  description: 'Cap installation labor',             price: '150.00', measured: false },
+      { pn: 'DEMO-HAULAWAY', description: 'Old cap removal and haul-away',      price: '45.00',  measured: false },
+    ],
+  };
+}
+
+function blankMeasurements(unit) {
+  return { width: '', length: '', height: '', units: unit, material: '', finish: '', notes: '', checked: false, changedAfterCheck: false };
+}
+
+function freshState() {
+  const s = {
+    settings: defaultSettings(),
+    step: 0,
+    visited: { 0: true },
+    touched: {},
+    nextLineNo: 1,
+    quoteNo: 'DEMO-Q-0001',
+    customer: { name: 'Jordan Sample', phone: '(555) 010-0123', email: 'jordan.sample@example.com' },
+    property: { street: '123 Example Avenue', city: 'Cincinnati', state: 'OH', zip: '45202', lat: '39.1031', lng: '-84.5120' },
+    lines: [],
+    deposit: { required: '', amount: '', collected: 'no' },
+  };
+  // Preloaded sample: the SAME product twice as separate lines with independent measurements
+  // (the second deliberately not yet checked, so Review shows a flag), plus a labor line.
+  const a = addLine(s, 'DEMO-CAP-SF');
+  Object.assign(a.m, { width: '13', length: '13', height: '10', material: 'Stainless steel', finish: 'Black powder coat', notes: 'Front flue, clay tile.', checked: true });
+  const b = addLine(s, 'DEMO-CAP-SF');
+  Object.assign(b.m, { width: '9', length: '13', height: '8', material: 'Stainless steel', finish: 'Mill / unpainted', notes: 'Rear flue — re-measure height.' });
+  addLine(s, 'DEMO-INSTALL');
+  return s;
+}
+
+function addLine(s, pn) {
+  const id = 'QL-' + String(s.nextLineNo++).padStart(3, '0');  // stable; never reused after removal
+  const line = { id, pn: '', description: '', catalogPrice: '', unitPrice: '', qty: '1', discountType: 'amount', discountValue: '', measured: false,
+                 m: blankMeasurements(s.settings.defaultUnit) };
+  s.lines.push(line);
+  if (pn) applyProduct(s, line, pn);
+  return line;
+}
+
+function applyProduct(s, line, pn) {
+  const item = s.settings.catalog.find(c => c.pn === pn);
+  line.pn = pn || '';
+  if (!item) { line.description = ''; line.catalogPrice = ''; line.unitPrice = ''; line.measured = false; return; }
+  line.description = item.description;
+  line.catalogPrice = item.price;
+  line.unitPrice = item.price;      // part number fills the price automatically; still editable
+  line.measured = !!item.measured;
+}
+
+let state = freshState();
+
+/* ---------------- helpers ---------------- */
+const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const $ = (sel, root = document) => root.querySelector(sel);
+const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+
+// Money handled in integer cents. Accepts "1,234.50" or "$1234.5".
+function parseMoney(str) {
+  const t = String(str == null ? '' : str).replace(/[$,\s]/g, '');
+  if (!/^\d+(\.\d{1,2})?$/.test(t)) return NaN;
+  return Math.round(parseFloat(t) * 100);
+}
+function fmt(cents) {
+  if (!Number.isFinite(cents)) return '—';
+  const neg = cents < 0; const v = Math.abs(cents);
+  return (neg ? '−' : '') + '$' + Math.floor(v / 100).toLocaleString('en-US') + '.' + String(v % 100).padStart(2, '0');
+}
+function parsePositive(str) {
+  const t = String(str == null ? '' : str).trim();
+  if (!/^\d*\.?\d+$/.test(t)) return NaN;
+  const n = parseFloat(t);
+  return n > 0 ? n : NaN;
+}
+function parseQty(str) {
+  const t = String(str == null ? '' : str).trim();
+  return /^\d+$/.test(t) && +t > 0 && +t <= 999 ? +t : NaN;
+}
+function businessDate(d) {
+  return new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric', month: 'long', day: 'numeric' }).format(d);
+}
+function trimNum(v) { const n = parseFloat(v); return Number.isFinite(n) ? String(+n.toFixed(3)) : String(v); }
+
+/* ---------------- calculations ---------------- */
+function lineCalc(line) {
+  const qty = parseQty(line.qty);
+  const unit = parseMoney(line.unitPrice);
+  const gross = Number.isFinite(qty) && Number.isFinite(unit) ? qty * unit : NaN;
+  let disc = 0, discErr = '';
+  const dv = String(line.discountValue).trim();
+  if (dv !== '') {
+    if (line.discountType === 'percent') {
+      const p = parseFloat(dv);
+      if (!/^\d*\.?\d+$/.test(dv) || !(p >= 0 && p <= 100)) { disc = NaN; discErr = 'Enter a percent from 0 to 100.'; }
+      else disc = Number.isFinite(gross) ? Math.round(gross * p / 100) : NaN;
+    } else {
+      disc = parseMoney(dv);
+      if (!Number.isFinite(disc)) discErr = 'Enter a dollar amount, e.g. 25.00';
+      else if (Number.isFinite(gross) && disc > gross) discErr = 'Discount cannot exceed the line amount (' + fmt(gross) + ').';
+    }
+  }
+  const net = Number.isFinite(gross) && Number.isFinite(disc) && !discErr ? gross - disc : NaN;
+  return { qty, unit, gross, disc: discErr ? NaN : disc, net, discErr };
+}
+function totals() {
+  let sub = 0, disc = 0, ok = true;
+  for (const l of state.lines) {
+    const c = lineCalc(l);
+    if (!Number.isFinite(c.net)) { ok = false; continue; }
+    sub += c.gross; disc += c.disc;
+  }
+  return { sub, disc, total: sub - disc, ok: ok && state.lines.length > 0 };
+}
+
+/* ---------------- validation ----------------
+   Returns { fields: {path: message}, issues: [{step, sev, msg, path}] }.
+   sev 'error' blocks the quote preview; 'warn' is an unresolved demo placeholder shown for review. */
+function validate() {
+  const fields = {}; const issues = [];
+  const err = (step, path, msg, label) => { fields[path] = msg; issues.push({ step, sev: 'error', path, msg: label ? label + ': ' + msg : msg }); };
+  const warn = (step, msg, path) => issues.push({ step, sev: 'warn', msg, path });
+  const c = state.customer, p = state.property;
+
+  if (!c.name.trim()) err(0, 'customer.name', 'Enter the customer name.', 'Customer');
+  if (c.email.trim() && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(c.email.trim())) err(0, 'customer.email', 'Enter a valid email or leave it blank.', 'Customer');
+  if (!p.street.trim()) err(0, 'property.street', 'Enter the street address.', 'Property');
+  if (!p.city.trim()) err(0, 'property.city', 'Enter the city.', 'Property');
+  if (!/^[A-Za-z]{2}$/.test(p.state.trim())) err(0, 'property.state', 'Use a 2-letter state, e.g. OH.', 'Property');
+  if (!/^\d{5}(-\d{4})?$/.test(p.zip.trim())) err(0, 'property.zip', 'Use a 5-digit ZIP (or ZIP+4).', 'Property');
+  const lat = parseFloat(p.lat), lng = parseFloat(p.lng);
+  if (!/^-?\d+(\.\d+)?$/.test(p.lat.trim()) || !(lat >= -90 && lat <= 90)) err(0, 'property.lat', 'Latitude must be between −90 and 90.', 'Property');
+  if (!/^-?\d+(\.\d+)?$/.test(p.lng.trim()) || !(lng >= -180 && lng <= 180)) err(0, 'property.lng', 'Longitude must be between −180 and 180.', 'Property');
+  warn(0, 'Coordinates are sample data, not a verified lookup.', 'property.lat');
+
+  if (!state.lines.length) issues.push({ step: 2, sev: 'error', msg: 'Add at least one product line.', path: '' });
+  for (const l of state.lines) {
+    const tag = 'Line ' + l.id;
+    const base = 'lines.' + l.id + '.';
+    if (!l.pn) { err(l.addedOn === 'measure' ? 1 : 2, base + 'pn', 'Choose a part number.', tag); continue; }
+    if (l.measured) {
+      const m = l.m;
+      for (const k of ['width', 'length', 'height']) {
+        if (!Number.isFinite(parsePositive(m[k]))) err(1, base + 'm.' + k, (m[k] === '' ? 'Enter the ' : 'Enter a positive number for ') + k + '.', tag);
+      }
+      if (!state.settings.units.includes(m.units)) err(1, base + 'm.units', 'Choose units.', tag);
+      if (!m.material) err(1, base + 'm.material', 'Choose a material.', tag);
+      if (!m.finish) err(1, base + 'm.finish', 'Choose a finish.', tag);
+      if (!m.checked) err(1, base + 'm.checked', 'Confirm “Measurements checked”.', tag);
+    }
+    const lc = lineCalc(l);
+    if (!Number.isFinite(lc.qty)) err(2, base + 'qty', 'Quantity must be a whole number from 1 to 999.', tag);
+    if (!Number.isFinite(lc.unit)) err(2, base + 'unitPrice', 'Enter a price, e.g. 189.00', tag);
+    else if (lc.unit === 0) err(2, base + 'unitPrice', 'Price is $0.00 — unfinished placeholder.', tag);
+    if (lc.discErr) err(2, base + 'discountValue', lc.discErr, tag);
+  }
+  if (state.lines.length) warn(2, 'All prices are demo placeholders pending Sean’s pricing rules.', '');
+
+  const d = state.deposit, t = totals();
+  if (d.required === '') err(4, 'deposit.required', 'Choose whether a deposit is required.', 'Deposit');
+  if (d.required === 'yes') {
+    const amt = parseMoney(d.amount);
+    if (String(d.amount).trim() === '') err(4, 'deposit.amount', 'Enter the deposit amount.', 'Deposit');
+    else if (!Number.isFinite(amt) || amt <= 0) err(4, 'deposit.amount', 'Enter an amount greater than $0.00.', 'Deposit');
+    else if (t.ok && amt > t.total) err(4, 'deposit.amount', 'Deposit cannot exceed the quote total (' + fmt(t.total) + ').', 'Deposit');
+  }
+  warn(4, 'Contract terms are a placeholder; signing (iPad or email) is pending Sean’s choice.', '');
+  return { fields, issues };
+}
+
+/* ---------------- state binding ---------------- */
+function getLine(id) { return state.lines.find(l => l.id === id); }
+function setPath(path, value) {
+  const parts = path.split('.');
+  if (parts[0] === 'lines') {
+    const line = getLine(parts[1]); if (!line) return;
+    if (parts[2] === 'm') {
+      const k = parts[3];
+      if (['width', 'length', 'height', 'units', 'material', 'finish'].includes(k) && line.m[k] !== value && line.m.checked) {
+        line.m.checked = false; line.m.changedAfterCheck = true;  // a changed measurement must be re-confirmed
+      }
+      line.m[k] = value;
+      if (k === 'checked' && value) line.m.changedAfterCheck = false;
+    } else line[parts[2]] = value;
+    return;
+  }
+  let o = state; for (let i = 0; i < parts.length - 1; i++) o = o[parts[i]];
+  o[parts[parts.length - 1]] = value;
+}
+
+/* ---------------- rendering ---------------- */
+let V = validate();
+const showErr = path => (state.touched[path] || state.visited['shown' + stepOfPath(path)]) ? (V.fields[path] || '') : '';
+function stepOfPath(path) {
+  if (path.startsWith('customer') || path.startsWith('property')) return 0;
+  if (path.startsWith('deposit')) return 4;
+  if (/^lines\.[^.]+\.m\./.test(path)) return 1;
+  const pm = /^lines\.([^.]+)\.pn$/.exec(path); if (pm && (getLine(pm[1]) || {}).addedOn === 'measure') return 1;
+  return 2;
+}
+function inv(path) { return showErr(path) ? 'true' : 'false'; }
+const errEl = path => `<div class="err" data-err="${esc(path)}" id="err-${esc(path)}">${esc(showErr(path))}</div>`;
+
+function field(path, label, value, opts = {}) {
+  const id = 'f-' + path;
+  const input = `<input class="input" id="${esc(id)}" data-path="${esc(path)}" value="${esc(value)}" ${opts.inputmode ? `inputmode="${opts.inputmode}"` : ''}
+     ${opts.type ? `type="${opts.type}"` : 'type="text"'} ${opts.autocomplete ? `autocomplete="${opts.autocomplete}"` : 'autocomplete="off"'} ${opts.maxlength ? `maxlength="${opts.maxlength}"` : ''}
+     aria-invalid="${inv(path)}" aria-describedby="err-${esc(path)}" ${opts.placeholder ? `placeholder="${esc(opts.placeholder)}"` : ''}>`;
+  let control = input;
+  if (opts.unit) control = `<div class="with-unit">${input}<span class="unit" data-unit-for="${esc(opts.unitFor || '')}">${esc(opts.unit)}</span></div>`;
+  if (opts.prefix) control = `<div class="with-prefix"><span class="pre">${esc(opts.prefix)}</span>${input}</div>`;
+  return `<div class="field ${opts.cls || ''}"><label for="${esc(id)}">${label}${opts.optional ? ' <span class="opt">(optional)</span>' : ''}</label>${control}${opts.help ? `<div class="help">${opts.help}</div>` : ''}${errEl(path)}</div>`;
+}
+function seg(path, label, options, current) {
+  const bad = !!showErr(path);
+  return `<div class="field"><span class="label" id="lbl-${esc(path)}">${label}</span>
+    <div class="seg ${bad ? 'invalid' : ''}" role="group" aria-labelledby="lbl-${esc(path)}">
+      ${options.map(o => `<button type="button" data-seg="${esc(path)}" data-val="${esc(o.v)}" aria-pressed="${o.v === current}">${esc(o.t)}</button>`).join('')}
+    </div>${errEl(path)}</div>`;
+}
+function productSelect(line, measuredOnly) {
+  const items = state.settings.catalog.filter(c => !measuredOnly || c.measured);
+  const path = 'lines.' + line.id + '.pn';
+  const known = state.settings.catalog.some(c => c.pn === line.pn);
+  return `<div class="field"><label for="f-${esc(path)}">Part number</label>
+    <select class="input" id="f-${esc(path)}" data-path="${esc(path)}" data-product="${esc(line.id)}" aria-invalid="${inv(path)}" aria-describedby="err-${esc(path)}">
+      <option value="">Choose a part number…</option>
+      ${!known && line.pn ? `<option value="${esc(line.pn)}" selected>${esc(line.pn)} — ${esc(line.description)} (no longer in demo catalog)</option>` : ''}
+      ${items.map(c => `<option value="${esc(c.pn)}" ${c.pn === line.pn ? 'selected' : ''}>${esc(c.pn)} — ${esc(c.description)} — ${fmt(parseMoney(c.price))}</option>`).join('')}
+    </select>${errEl(path)}</div>`;
+}
+function measureSummary(line) {
+  const m = line.m;
+  const dims = ['width', 'length', 'height'].map(k => m[k] === '' ? '?' : trimNum(m[k])).join(' × ');
+  const parts = [`W × L × H: ${dims} ${m.units}`];
+  if (m.material) parts.push(m.material);
+  if (m.finish) parts.push(m.finish);
+  return parts.join(' · ');
+}
+
+function renderStepper() {
+  const byStep = {}; V.issues.forEach(i => { if (i.sev === 'error') byStep[i.step] = (byStep[i.step] || 0) + 1; });
+  $('#stepper').innerHTML = STEPS.map((s, i) => {
+    let flag = '';
+    if (i < 5 && state.visited[i]) flag = byStep[i] ? `<span class="step-flag bad" title="${byStep[i]} to fix">${byStep[i]} to fix</span>` : (i === 3 ? '' : '<span class="step-flag ok">✓</span>');
+    return `<button type="button" class="step-tab" data-goto="${i}" ${i === state.step ? 'aria-current="step"' : ''}><span class="step-num">${i + 1}</span>${esc(s.label)}${flag}</button>`;
+  }).join('');
+  const cur = $('.step-tab[aria-current="step"]'); if (cur && cur.scrollIntoView) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+function renderCustomer() {
+  const c = state.customer, p = state.property;
+  return `
+  <div class="step-title"><h2>Customer &amp; property</h2><span class="hint">Fictional sample — edit freely for the demo.</span></div>
+  <div class="two-col">
+    <section class="card"><h3>Customer <span class="pill sample">Fictional</span></h3>
+      <div class="grid">
+        ${field('customer.name', 'Customer name', c.name)}
+        ${field('customer.phone', 'Phone', c.phone, { inputmode: 'tel', optional: true })}
+        ${field('customer.email', 'Email', c.email, { inputmode: 'email', optional: true })}
+      </div>
+    </section>
+    <section class="card"><h3>Service property <span class="pill sample">Sample</span></h3>
+      <div class="grid g2">
+        ${field('property.street', 'Street', p.street, { cls: 'span2' })}
+        ${field('property.city', 'City', p.city)}
+        <div class="grid g2" style="gap:10px">
+          ${field('property.state', 'State', p.state, { maxlength: 2 })}
+          ${field('property.zip', 'ZIP', p.zip, { inputmode: 'numeric', maxlength: 10 })}
+        </div>
+      </div>
+      <div class="note warn" style="margin:16px 0 12px"><strong>Sample coordinates — not a verified lookup</strong>These numbers were typed in for the demo. Nothing here geocodes or checks the address.</div>
+      <div class="grid g2">
+        ${field('property.lat', 'Latitude <span class="pill sample">Sample</span>', p.lat, { inputmode: 'decimal' })}
+        ${field('property.lng', 'Longitude <span class="pill sample">Sample</span>', p.lng, { inputmode: 'decimal' })}
+      </div>
+    </section>
+  </div>
+  <div class="note info"><strong>In the real module</strong>Every property must have a clean service address and verified coordinates saved in GHL when it is created. This prototype does not create or look up anything in GHL.</div>`;
+}
+
+function renderMeasure() {
+  const lines = state.lines.filter(l => l.measured || (!l.pn && l.addedOn === 'measure'));
+  const s = state.settings;
+  const cards = lines.map(l => {
+    const b = 'lines.' + l.id + '.';
+    const m = l.m;
+    const checkedBad = !!showErr(b + 'm.checked');
+    return `<section class="card line-card" data-line="${esc(l.id)}">
+      <div class="card-head"><h3>Cap line <span class="pill id">${esc(l.id)}</span></h3>
+        <div class="row-actions">
+          <button type="button" class="btn small quiet" data-act="dup" data-line="${esc(l.id)}" ${l.pn ? '' : 'disabled'}>+ Another of this product</button>
+          <button type="button" class="btn small danger" data-act="remove" data-line="${esc(l.id)}">Remove</button>
+        </div></div>
+      <div class="grid g2">${productSelect(l, true)}
+        <div class="field"><span class="label">Description</span><div class="input" style="display:flex;align-items:center" readonly>${esc(l.description || '—')}</div></div></div>
+      <div class="grid g4" style="margin-top:14px">
+        ${field(b + 'm.width', 'Width', m.width, { inputmode: 'decimal', unit: m.units, unitFor: l.id })}
+        ${field(b + 'm.length', 'Length', m.length, { inputmode: 'decimal', unit: m.units, unitFor: l.id })}
+        ${field(b + 'm.height', 'Height', m.height, { inputmode: 'decimal', unit: m.units, unitFor: l.id })}
+        ${seg(b + 'm.units', 'Units', s.units.map(u => ({ v: u, t: u })), m.units)}
+      </div>
+      <div class="grid g2" style="margin-top:14px">
+        ${seg(b + 'm.material', 'Material <span class="pill sample">Sample options</span>', s.materials.map(v => ({ v, t: v })).concat(m.material && !s.materials.includes(m.material) ? [{ v: m.material, t: m.material + ' (removed)' }] : []), m.material)}
+        ${seg(b + 'm.finish', 'Finish <span class="pill sample">Sample options</span>', s.finishes.map(v => ({ v, t: v })).concat(m.finish && !s.finishes.includes(m.finish) ? [{ v: m.finish, t: m.finish + ' (removed)' }] : []), m.finish)}
+      </div>
+      <div class="grid g2" style="margin-top:14px; align-items:start">
+        <div class="field"><label for="f-${esc(b)}m.notes">Measurement notes <span class="opt">(optional)</span></label>
+          <textarea class="input" id="f-${esc(b)}m.notes" data-path="${esc(b)}m.notes">${esc(m.notes)}</textarea></div>
+        <div class="field"><span class="label">Confirmation</span>
+          <label class="check ${m.checked ? 'on' : ''} ${checkedBad ? 'invalid' : ''}" data-check-wrap="${esc(l.id)}">
+            <input type="checkbox" data-path="${esc(b)}m.checked" ${m.checked ? 'checked' : ''} aria-describedby="err-${esc(b)}m.checked">
+            <span><b>Measurements checked</b><br><span class="help" style="margin:0">I re-checked width, length, height, units, material and finish for this line.</span></span>
+          </label>
+          <div class="help" data-changed-note="${esc(l.id)}" ${m.changedAfterCheck && !m.checked ? '' : 'hidden'}>A measurement changed after it was checked — please check again.</div>
+          ${errEl(b + 'm.checked')}</div>
+      </div>
+    </section>`;
+  }).join('');
+  const others = state.lines.filter(l => l.pn && !l.measured);
+  return `
+  <div class="step-title"><h2>Cap measurements</h2><span class="hint">One card per cap line. Repeated products get their own line and measurements.</span></div>
+  <div class="note warn"><strong>Provisional sample fields — pending Sean’s actual cap sheet</strong>These fields only show the idea. They do not establish fabrication requirements and do not guarantee fit.</div>
+  ${cards || '<div class="card">No cap lines yet.</div>'}
+  <div class="row-actions" style="margin-bottom:16px"><button type="button" class="btn" data-act="add-cap">+ Add cap line</button></div>
+  ${others.length ? `<div class="help">Lines that need no measurements (${others.map(l => esc(l.id) + ' ' + esc(l.description)).join(', ')}) are managed in step 3.</div>` : ''}`;
+}
+
+function renderPricing() {
+  const t = totals();
+  const cards = state.lines.map(l => {
+    const b = 'lines.' + l.id + '.';
+    const c = lineCalc(l);
+    const edited = l.catalogPrice !== '' && Number.isFinite(c.unit) && c.unit !== parseMoney(l.catalogPrice);
+    const mErrs = l.measured ? Object.keys(V.fields).filter(k => k.startsWith(b + 'm.')).length : 0;
+    return `<section class="card line-card" data-line="${esc(l.id)}">
+      <div class="card-head"><h3>Line <span class="pill id">${esc(l.id)}</span> <span data-desc="${esc(l.id)}">${esc(l.description)}</span></h3>
+        <div class="row-actions">
+          <button type="button" class="btn small quiet" data-act="dup" data-line="${esc(l.id)}" ${l.pn ? '' : 'disabled'}>+ Another of this product</button>
+          <button type="button" class="btn small danger" data-act="remove" data-line="${esc(l.id)}">Remove</button></div></div>
+      <div class="grid g2">${productSelect(l, false)}
+        <div class="field"><span class="label">Measurements</span>
+          ${l.measured ? `<div class="line-meta">${esc(measureSummary(l))}</div>
+            <div class="${mErrs ? 'err' : 'help'}" style="margin-top:4px">${mErrs ? mErrs + ' measurement item(s) to finish' : (l.m.checked ? '✓ Measurements checked' : '')}</div>
+            <button type="button" class="btn small quiet" style="margin-top:6px" data-goto="1" data-focus-line="${esc(l.id)}">Edit measurements</button>`
+            : `<div class="line-meta">${l.pn ? 'Not needed for this product.' : 'Choose a part number first.'}</div>`}
+        </div></div>
+      <div class="grid g4" style="margin-top:14px; align-items:start">
+        ${field(b + 'qty', 'Quantity', l.qty, { inputmode: 'numeric' })}
+        ${field(b + 'unitPrice', 'Unit price <span class="pill sample">Demo</span>', l.unitPrice, { inputmode: 'decimal', prefix: '$',
+            help: l.catalogPrice !== '' ? `<span data-edited="${esc(l.id)}">${edited ? `Edited — catalog ${fmt(parseMoney(l.catalogPrice))}. <button type="button" class="btn small quiet" data-act="reset-price" data-line="${esc(l.id)}">Use catalog price</button>` : 'Filled from catalog.'}</span>` : '' })}
+        <div class="field"><span class="label">Discount <span class="opt">(optional)</span></span>
+          <div class="seg" style="margin-bottom:8px">
+            <button type="button" data-seg="${esc(b)}discountType" data-val="amount" aria-pressed="${l.discountType === 'amount'}">$ amount</button>
+            <button type="button" data-seg="${esc(b)}discountType" data-val="percent" aria-pressed="${l.discountType === 'percent'}">% percent</button></div>
+          <input class="input" type="text" inputmode="decimal" id="f-${esc(b)}discountValue" data-path="${esc(b)}discountValue" value="${esc(l.discountValue)}" placeholder="${l.discountType === 'percent' ? 'e.g. 10' : 'e.g. 25.00'}" aria-label="Discount ${l.discountType === 'percent' ? 'percent' : 'amount'}" aria-invalid="${inv(b + 'discountValue')}" aria-describedby="err-${esc(b)}discountValue">
+          ${errEl(b + 'discountValue')}</div>
+        <div class="field"><span class="label">Line total</span>
+          <div class="line-meta money" data-calc="gross:${esc(l.id)}">${lineBreakdown(c)}</div>
+          <div class="line-total money" data-calc="net:${esc(l.id)}">${fmt(c.net)}</div></div>
+      </div>
+    </section>`;
+  }).join('');
+  return `
+  <div class="step-title"><h2>Products &amp; pricing</h2><span class="hint">Pick a part number to fill its price. Edit quantity, price and discount per line.</span></div>
+  <div class="note warn"><strong>Demo prices are placeholders</strong>They are pending Sean’s pricing rules. There is no measurement-based pricing formula in this sample.</div>
+  ${cards || '<div class="card">No lines yet.</div>'}
+  <div class="row-actions" style="margin-bottom:16px"><button type="button" class="btn" data-act="add-line">+ Add product line</button></div>
+  <section class="card"><h3>Totals</h3>${totalsBlock(t)}</section>`;
+}
+function lineBreakdown(c) {
+  if (!Number.isFinite(c.gross)) return 'Fix quantity / price';
+  return `${c.qty} × ${fmt(c.unit)} = ${fmt(c.gross)}` + (Number.isFinite(c.disc) && c.disc ? `<br>Discount −${fmt(c.disc)}` : '');
+}
+function totalsBlock(t) {
+  return `<div class="totals" data-calc="totals">
+    <div class="t-row"><span>Subtotal</span><span class="money">${t.ok ? fmt(t.sub) : '—'}</span></div>
+    <div class="t-row"><span>Discounts</span><span class="money">${t.ok ? (t.disc ? '−' + fmt(t.disc) : fmt(0)) : '—'}</span></div>
+    <div class="t-row"><span>Tax <span class="muted">— not calculated in demo (pending Sean)</span></span><span class="money">—</span></div>
+    <div class="t-row grand"><span>Total</span><span class="money">${t.ok ? fmt(t.total) : 'Fix lines first'}</span></div></div>`;
+}
+
+function issuesPanel(list, compact) {
+  const errors = list.filter(i => i.sev === 'error'), warns = list.filter(i => i.sev === 'warn');
+  const item = i => `<li><span class="txt">${esc(i.msg)}</span><button type="button" class="btn small quiet" data-goto="${i.step}" data-focus-path="${esc(i.path || '')}">Go to step ${i.step + 1}</button></li>`;
+  return `${errors.length ? `<div class="note bad" data-issues="errors"><strong>${errors.length} item(s) to finish before the quote preview</strong><ul class="issue-list">${errors.map(item).join('')}</ul></div>`
+                          : `<div class="note good" data-issues="errors"><strong>No blocking issues</strong>Everything required for the sample preview is filled in.</div>`}
+    ${!compact && warns.length ? `<div class="note warn" data-issues="warns"><strong>Demo placeholders still in use (not blocking)</strong><ul class="issue-list">${warns.map(item).join('')}</ul></div>` : ''}`;
+}
+
+function renderReview() {
+  const c = state.customer, p = state.property, t = totals();
+  const ed = (step, txt) => `<button type="button" class="btn small quiet" data-goto="${step}">${txt || 'Edit'}</button>`;
+  const lines = state.lines.map(l => {
+    const lc = lineCalc(l);
+    return `<div class="review-line" data-review-line="${esc(l.id)}">
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between">
+        <div><span class="pill id">${esc(l.id)}</span> <b>${esc(l.pn || 'No part number')}</b> — ${esc(l.description || '—')}</div>
+        <div class="money"><b>${fmt(lc.net)}</b></div></div>
+      ${l.measured ? `<div class="line-meta" style="margin-top:4px">${esc(measureSummary(l))}${l.m.notes ? ' · Notes: ' + esc(l.m.notes) : ''} · ${l.m.checked ? '✓ Measurements checked' : '<b style="color:var(--danger-text)">Not checked</b>'}</div>` : ''}
+      <div class="line-meta">${Number.isFinite(lc.gross) ? `Qty ${lc.qty} × ${fmt(lc.unit)}` : 'Quantity/price incomplete'}${Number.isFinite(lc.disc) && lc.disc ? ` · Discount −${fmt(lc.disc)}${l.discountType === 'percent' ? ' (' + esc(l.discountValue) + '%)' : ''}` : ''}</div>
+      <div class="row-actions" style="margin-top:6px">${l.measured ? `<button type="button" class="btn small quiet" data-goto="1" data-focus-line="${esc(l.id)}">Edit measurements</button>` : ''}<button type="button" class="btn small quiet" data-goto="2" data-focus-line="${esc(l.id)}">Edit pricing</button></div>
+    </div>`;
+  }).join('');
+  return `
+  <div class="step-title"><h2>Review</h2><span class="hint">Check everything. Editing a section keeps all current entries.</span></div>
+  ${issuesPanel(V.issues)}
+  <div class="two-col">
+    <section class="card"><div class="card-head"><h3>Customer</h3>${ed(0)}</div>
+      <dl class="review-dl"><dt>Name</dt><dd>${esc(c.name) || '—'}</dd><dt>Phone</dt><dd>${esc(c.phone) || '—'}</dd><dt>Email</dt><dd>${esc(c.email) || '—'}</dd></dl></section>
+    <section class="card"><div class="card-head"><h3>Property</h3>${ed(0)}</div>
+      <dl class="review-dl"><dt>Address</dt><dd>${esc(p.street)}<br>${esc(p.city)}, ${esc(p.state)} ${esc(p.zip)}</dd>
+      <dt>Coordinates</dt><dd>${esc(p.lat)}, ${esc(p.lng)} <span class="pill sample">Sample, unverified</span></dd></dl></section>
+  </div>
+  <section class="card"><div class="card-head"><h3>Products (${state.lines.length} line${state.lines.length === 1 ? '' : 's'})</h3>${ed(1, 'Edit measurements')}${ed(2, 'Edit pricing')}</div>${lines || '<div class="line-meta">No lines.</div>'}</section>
+  <section class="card"><h3>Totals</h3>${totalsBlock(t)}</section>`;
+}
+
+function renderContract() {
+  const d = state.deposit, t = totals(), s = state.settings;
+  const pct = parseFloat(s.depositExamplePercent);
+  const example = t.ok && pct > 0 && pct <= 100 ? Math.round(t.total * pct / 100) : NaN;
+  return `
+  <div class="step-title"><h2>Contract &amp; deposit</h2></div>
+  <div class="two-col">
+    <section class="card"><h3>Contract <span class="pill sample">Sample section</span></h3>
+      <div class="choice-tile" style="margin-bottom:14px"><b>[Contract terms placeholder]</b><br>No legal terms are included in this demo. The real wording will come from the business.</div>
+      <div class="note info"><strong>Finished module: GHL Documents &amp; Contracts</strong>Contracts and signatures will be handled in GHL. This prototype has no signature capture.</div>
+      <span class="label" style="font-weight:600;font-size:15px">Signing method <span class="pill pending">Pending Sean’s choice</span></span>
+      <div class="grid g2" style="margin-top:8px">
+        <div class="choice-tile"><b>Sign on the iPad</b><br>Customer signs in person through GHL.</div>
+        <div class="choice-tile"><b>Email signing link</b><br>GHL emails the customer a link to sign.</div>
+      </div>
+    </section>
+    <section class="card"><h3>Deposit</h3>
+      ${seg('deposit.required', 'Deposit required?', [{ v: 'yes', t: 'Yes' }, { v: 'no', t: 'No' }], d.required)}
+      <div ${d.required === 'yes' ? '' : 'hidden'} data-deposit-yes>
+        <div style="margin-top:14px">${field('deposit.amount', 'Deposit amount', d.amount, { inputmode: 'decimal', prefix: '$' })}</div>
+        <div class="note warn" style="margin-top:10px"><strong>Example calculation — not a company rule</strong>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px">
+            <span>Fill</span>
+            <span class="with-unit" style="width:110px"><input class="input" type="text" inputmode="decimal" data-path="settings.depositExamplePercent" value="${esc(s.depositExamplePercent)}" aria-label="Example deposit percent"><span class="unit">%</span></span>
+            <span>of the total =</span><b class="money" data-calc="deposit-example">${fmt(example)}</b>
+            <button type="button" class="btn small" data-act="fill-deposit">Use example amount</button>
+          </div></div>
+        <div style="margin-top:6px">${seg('deposit.collected', 'Deposit collected?', [{ v: 'yes', t: 'Yes' }, { v: 'no', t: 'No' }], d.collected)}</div>
+        <div class="help">“Collected” is a status the salesperson records by hand. This demo does not take, process or verify any payment.</div>
+      </div>
+      <div class="totals" style="margin-top:16px"><div class="t-row grand"><span>Quote total</span><span class="money" data-calc="grand">${t.ok ? fmt(t.total) : '—'}</span></div></div>
+    </section>
+  </div>`;
+}
+
+function quoteDoc() {
+  const c = state.customer, p = state.property, s = state.settings, t = totals(), d = state.deposit;
+  const rows = state.lines.map((l, i) => {
+    const lc = lineCalc(l);
+    return `<tr><td>${i + 1}</td>
+      <td><b>${esc(l.description)}</b><div class="spec">${esc(l.pn)} · Line ${esc(l.id)}</div>
+        ${l.measured ? `<div class="spec">${esc(measureSummary(l))}${l.m.notes ? '<br>Notes: ' + esc(l.m.notes) : ''}</div>` : ''}</td>
+      <td class="num">${lc.qty}</td><td class="num">${fmt(lc.unit)}</td><td class="num">${lc.disc ? '−' + fmt(lc.disc) : '—'}</td><td class="num"><b>${fmt(lc.net)}</b></td></tr>`;
+  }).join('');
+  return `<article class="quote-doc" id="quote-doc">
+    <div class="wm" aria-hidden="true"><span>DEMO</span></div>
+    <div class="doc-demo">DEMO — NOT FOR CUSTOMER USE · Sample quote with fictional data and placeholder prices</div>
+    <div class="doc-head"><div><div class="co">${esc(s.companyName)}</div><div style="color:var(--muted)">Chimney cap quote — sample</div></div>
+      <div class="meta"><b>Quote ${esc(state.quoteNo)}</b><br>${esc(businessDate(new Date()))}</div></div>
+    <div class="doc-parties">
+      <div><h4>Prepared for</h4><b>${esc(c.name)}</b>${c.phone ? '<br>' + esc(c.phone) : ''}${c.email ? '<br>' + esc(c.email) : ''}</div>
+      <div><h4>Service property</h4>${esc(p.street)}<br>${esc(p.city)}, ${esc(p.state.toUpperCase())} ${esc(p.zip)}</div>
+    </div>
+    <div class="table-wrap"><table class="doc-table">
+      <thead><tr><th>#</th><th>Item</th><th class="num">Qty</th><th class="num">Unit price</th><th class="num">Discount</th><th class="num">Amount</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>
+    ${totalsBlock(t).replace('— not calculated in demo (pending Sean)', '— not calculated (sample)')}
+    <div class="doc-sec"><h4>Deposit</h4>${d.required === 'yes'
+      ? `Deposit required: <b>${fmt(parseMoney(d.amount))}</b>. Status: <b>${d.collected === 'yes' ? 'Recorded as collected' : 'Not collected'}</b> (recorded manually; not payment verification).`
+      : 'No deposit required.'}</div>
+    <div class="doc-sec"><h4>Contract</h4>[Contract terms placeholder — no legal terms in this sample.] In the finished module the contract and signature are handled in GHL Documents &amp; Contracts; signing method pending.</div>
+    <div class="doc-foot">Measurements and options are a provisional sample and do not establish fabrication requirements or guarantee fit. Prices are demo placeholders.<br><b style="color:#8E2626">DEMO — NOT FOR CUSTOMER USE</b></div>
+    <div class="print-only print-demo-foot">DEMO — NOT FOR CUSTOMER USE · ${esc(state.quoteNo)}</div>
+  </article>`;
+}
+
+function renderPreview() {
+  const errors = V.issues.filter(i => i.sev === 'error');
+  if (errors.length) {
+    return `<div class="step-title"><h2>Quote preview</h2></div>
+      <div class="note bad" data-preview-blocked><strong>The sample quote can’t be generated yet</strong>Finish the items below, then come back.</div>
+      ${issuesPanel(V.issues, true)}`;
+  }
+  return `<div class="step-title"><h2>Quote preview</h2><span class="hint">Printable sample. There is no Send button — sending is not part of this demo.</span></div>
+    <div class="preview-tools screen-only">
+      <button type="button" class="btn primary" data-act="print">Print / Save as PDF</button>
+      <span class="help">The demo warning stays on every printed page.</span></div>
+    ${quoteDoc()}`;
+}
+
+const RENDER = [renderCustomer, renderMeasure, renderPricing, renderReview, renderContract, renderPreview];
+function render(opts = {}) {
+  V = validate();
+  const main = $('#main'); const y = window.scrollY;
+  main.innerHTML = RENDER[state.step]();
+  document.body.classList.toggle('on-preview', state.step === 5);
+  $('#hdr-company').textContent = state.settings.companyName + ' · sample';
+  renderStepper();
+  $('#btn-back').disabled = state.step === 0;
+  $('#btn-next').hidden = state.step === STEPS.length - 1;
+  $('#btn-next').textContent = state.step === 4 ? 'Generate preview ›' : 'Next ›';
+  $('#where').innerHTML = `Step ${state.step + 1} of ${STEPS.length}<span class="long"> · ${esc(STEPS[state.step].label)}</span>`;
+  if (opts.top) window.scrollTo(0, 0); else window.scrollTo(0, y);
+}
+
+// After typing: refresh validation messages and calculated figures without re-rendering (keeps focus).
+function refreshDerived() {
+  V = validate();
+  $$('[data-err]').forEach(el => {
+    const msg = showErr(el.dataset.err); el.textContent = msg;
+    const input = document.getElementById('f-' + el.dataset.err); if (input) input.setAttribute('aria-invalid', msg ? 'true' : 'false');
+  });
+  for (const l of state.lines) {
+    const c = lineCalc(l);
+    const g = $(`[data-calc="gross:${CSS.escape(l.id)}"]`); if (g) g.innerHTML = lineBreakdown(c);
+    const n = $(`[data-calc="net:${CSS.escape(l.id)}"]`); if (n) n.textContent = fmt(c.net);
+    const e = $(`[data-edited="${CSS.escape(l.id)}"]`);
+    if (e) {
+      const edited = Number.isFinite(c.unit) && c.unit !== parseMoney(l.catalogPrice);
+      e.innerHTML = edited ? `Edited — catalog ${fmt(parseMoney(l.catalogPrice))}. <button type="button" class="btn small quiet" data-act="reset-price" data-line="${esc(l.id)}">Use catalog price</button>` : 'Filled from catalog.';
+    }
+    const wrap = $(`[data-check-wrap="${CSS.escape(l.id)}"]`);
+    if (wrap) {
+      const cb = wrap.querySelector('input'); cb.checked = l.m.checked;
+      wrap.classList.toggle('on', l.m.checked); wrap.classList.toggle('invalid', !!showErr('lines.' + l.id + '.m.checked'));
+      const note = $(`[data-changed-note="${CSS.escape(l.id)}"]`); if (note) note.hidden = !(l.m.changedAfterCheck && !l.m.checked);
+    }
+  }
+  const t = totals();
+  $$('[data-calc="totals"]').forEach(el => { el.outerHTML = totalsBlock(t); });
+  const gr = $('[data-calc="grand"]'); if (gr) gr.textContent = t.ok ? fmt(t.total) : '—';
+  const ex = $('[data-calc="deposit-example"]');
+  if (ex) { const pct = parseFloat(state.settings.depositExamplePercent); ex.textContent = fmt(t.ok && pct > 0 && pct <= 100 ? Math.round(t.total * pct / 100) : NaN); }
+  renderStepper();
+}
+
+function goTo(step, focus = {}) {
+  state.visited['shown' + state.step] = true;   // leaving a step reveals its validation messages
+  state.step = Math.max(0, Math.min(STEPS.length - 1, step));
+  state.visited[state.step] = true;
+  if (state.step >= 3) { [0, 1, 2].forEach(i => { state.visited[i] = true; state.visited['shown' + i] = true; }); }
+  if (state.step === 5) { state.visited[4] = true; state.visited['shown4'] = true; }
+  render({ top: true });
+  const target = focus.path ? document.getElementById('f-' + focus.path) || $(`[data-seg="${CSS.escape(focus.path)}"]`)
+               : focus.line ? $(`[data-line="${CSS.escape(focus.line)}"]`) : null;
+  if (target) { target.scrollIntoView({ block: 'center' }); if (target.focus && focus.path) target.focus({ preventScroll: true }); }
+  else $('#main').focus({ preventScroll: true });
+}
+
+/* ---------------- modal ---------------- */
+function openModal({ title, body, actions }) {
+  const root = $('#modal-root');
+  root.innerHTML = `<div class="modal-back" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="modal">
+    <header><h2 id="modal-title">${esc(title)}</h2></header><div class="body">${body}</div>
+    <footer>${actions.map((a, i) => `<button type="button" class="btn ${a.cls || ''}" data-modal-act="${i}">${esc(a.label)}</button>`).join('')}</footer></div></div>`;
+  root.onclick = e => {
+    const b = e.target.closest('[data-modal-act]');
+    if (b) { const a = actions[+b.dataset.modalAct]; if (!a.run || a.run() !== false) closeModal(); }
+    else if (e.target.classList.contains('modal-back')) closeModal();
+  };
+  const first = root.querySelector('.modal .body input, .modal footer .btn'); if (first) first.focus();
+}
+function closeModal() { $('#modal-root').innerHTML = ''; }
+
+function openSettings() {
+  const s = state.settings;
+  const catRow = (c, i) => `<div class="cat-row" data-cat-row="${i}">
+      <input class="input" data-cat="pn" value="${esc(c.pn)}" aria-label="Part number">
+      <input class="input" data-cat="description" value="${esc(c.description)}" aria-label="Description">
+      <div class="with-prefix"><span class="pre">$</span><input class="input" data-cat="price" inputmode="decimal" value="${esc(c.price)}" aria-label="Price"></div>
+      <label class="mini"><input type="checkbox" data-cat="measured" ${c.measured ? 'checked' : ''}> Needs measurements</label>
+      <button type="button" class="btn small danger" data-cat-remove="${i}">Remove</button></div>`;
+  openModal({
+    title: 'Demo settings',
+    body: `<div class="note warn"><strong>All values are placeholders</strong>Changes last until the page is refreshed or the sample is reset.</div>
+      <div class="grid g2">
+        <div class="field"><label for="set-company">Company name</label><input class="input" id="set-company" value="${esc(s.companyName)}"></div>
+        <div class="field"><label for="set-pct">Example deposit %</label><input class="input" id="set-pct" inputmode="decimal" value="${esc(s.depositExamplePercent)}"><div class="help">Example only — not a company rule.</div></div>
+        <div class="field"><label for="set-units">Units (comma-separated)</label><input class="input" id="set-units" value="${esc(s.units.join(', '))}"></div>
+        <div class="field"><label for="set-defunit">Default unit for new lines</label><input class="input" id="set-defunit" value="${esc(s.defaultUnit)}"></div>
+        <div class="field"><label for="set-mat">Materials (one per line)</label><textarea class="input" id="set-mat">${esc(s.materials.join('\n'))}</textarea></div>
+        <div class="field"><label for="set-fin">Finishes (one per line)</label><textarea class="input" id="set-fin">${esc(s.finishes.join('\n'))}</textarea></div>
+      </div>
+      <h3 style="margin:18px 0 6px;color:var(--brand)">Demo catalog</h3>
+      <div class="help" style="margin-bottom:6px">Changing a catalog price does not change lines already on the quote — each line keeps the price filled when its part number was chosen.</div>
+      <div class="cat-row head"><span>Part number</span><span>Description</span><span>Price</span><span></span><span></span></div>
+      <div id="cat-rows">${s.catalog.map(catRow).join('')}</div>
+      <button type="button" class="btn small" id="cat-add" style="margin-top:10px">+ Add catalog item</button>
+      <div class="err" id="set-err"></div>`,
+    actions: [{ label: 'Cancel', cls: 'quiet' }, { label: 'Save settings', cls: 'primary', run: saveSettings }],
+  });
+  const rows = $('#cat-rows');
+  $('#cat-add').onclick = () => { rows.insertAdjacentHTML('beforeend', catRow({ pn: '', description: '', price: '', measured: true }, rows.children.length)); };
+  rows.onclick = e => { const b = e.target.closest('[data-cat-remove]'); if (b) b.closest('.cat-row').remove(); };
+}
+function saveSettings() {
+  const list = v => v.split(/[\n,]/).map(x => x.trim()).filter(Boolean);
+  const out = {
+    companyName: $('#set-company').value.trim(),
+    depositExamplePercent: $('#set-pct').value.trim(),
+    units: [...new Set(list($('#set-units').value))],
+    defaultUnit: $('#set-defunit').value.trim(),
+    materials: [...new Set($('#set-mat').value.split('\n').map(x => x.trim()).filter(Boolean))],
+    finishes: [...new Set($('#set-fin').value.split('\n').map(x => x.trim()).filter(Boolean))],
+    catalog: $$('#cat-rows .cat-row').map(r => ({ pn: r.querySelector('[data-cat="pn"]').value.trim(), description: r.querySelector('[data-cat="description"]').value.trim(),
+      price: r.querySelector('[data-cat="price"]').value.trim(), measured: r.querySelector('[data-cat="measured"]').checked })),
+  };
+  const problems = [];
+  if (!out.companyName) problems.push('Enter a company name.');
+  const pct = parseFloat(out.depositExamplePercent);
+  if (!/^\d*\.?\d+$/.test(out.depositExamplePercent) || !(pct > 0 && pct <= 100)) problems.push('Example deposit % must be from 0 to 100.');
+  if (!out.units.length) problems.push('Enter at least one unit.');
+  if (!out.units.includes(out.defaultUnit)) problems.push('Default unit must be one of the units.');
+  if (!out.materials.length || !out.finishes.length) problems.push('Enter at least one material and one finish.');
+  if (!out.catalog.length) problems.push('Keep at least one catalog item.');
+  const seen = new Set();
+  out.catalog.forEach((c, i) => {
+    if (!c.pn || !c.description) problems.push(`Catalog row ${i + 1}: part number and description are required.`);
+    if (seen.has(c.pn)) problems.push(`Catalog row ${i + 1}: duplicate part number ${c.pn}.`); seen.add(c.pn);
+    if (!Number.isFinite(parseMoney(c.price))) problems.push(`Catalog row ${i + 1}: enter a price such as 189.00.`);
+    else c.price = (parseMoney(c.price) / 100).toFixed(2);
+  });
+  if (problems.length) { $('#set-err').innerHTML = problems.map(esc).join('<br>'); return false; }
+  state.settings = out;
+  render();
+}
+
+/* ---------------- events ---------------- */
+document.addEventListener('input', e => {
+  const el = e.target; const path = el.dataset && el.dataset.path;
+  if (!path || el.type === 'checkbox' || el.tagName === 'SELECT') return;
+  setPath(path, el.value);
+  state.touched[path] = true;
+  refreshDerived();
+});
+document.addEventListener('focusout', e => {
+  const path = e.target.dataset && e.target.dataset.path;
+  if (path && !state.touched[path]) { state.touched[path] = true; refreshDerived(); }
+});
+document.addEventListener('change', e => {
+  const el = e.target; const path = el.dataset && el.dataset.path; if (!path) return;
+  if (el.dataset.product) { applyProduct(state, getLine(el.dataset.product), el.value); state.touched[path] = true; render(); return; }
+  if (el.type === 'checkbox') { setPath(path, el.checked); state.touched[path] = true; refreshDerived(); }
+});
+document.addEventListener('click', e => {
+  const segBtn = e.target.closest('[data-seg]');
+  if (segBtn) {
+    const path = segBtn.dataset.seg;
+    setPath(path, segBtn.dataset.val); state.touched[path] = true;
+    if (path.endsWith('discountType')) { const l = getLine(path.split('.')[1]); l.discountValue = ''; }
+    render(); return;
+  }
+  const go = e.target.closest('[data-goto]');
+  if (go) { goTo(+go.dataset.goto, { line: go.dataset.focusLine, path: go.dataset.focusPath }); return; }
+  const a = e.target.closest('[data-act]'); if (!a) return;
+  const act = a.dataset.act, line = a.dataset.line && getLine(a.dataset.line);
+  if (act === 'next') goTo(state.step + 1);
+  else if (act === 'back') goTo(state.step - 1);
+  else if (act === 'add-cap') { const l = addLine(state, ''); l.addedOn = 'measure'; render(); focusLine(l.id); }
+  else if (act === 'add-line') { const l = addLine(state, ''); render(); focusLine(l.id); }
+  else if (act === 'dup' && line) { const l = addLine(state, line.pn); if (state.step === 1) l.addedOn = 'measure'; render(); focusLine(l.id); }
+  else if (act === 'reset-price' && line) { line.unitPrice = line.catalogPrice; render(); }
+  else if (act === 'fill-deposit') {
+    const t = totals(), pct = parseFloat(state.settings.depositExamplePercent);
+    if (t.ok && pct > 0 && pct <= 100) { state.deposit.amount = (Math.round(t.total * pct / 100) / 100).toFixed(2); state.touched['deposit.amount'] = true; render(); }
+  }
+  else if (act === 'remove' && line) {
+    openModal({ title: `Remove line ${line.id}?`, body: `<p>${esc(line.pn || 'No part number')} — ${esc(line.description || '')}</p><p>Its measurements and pricing are removed. Other lines keep their IDs.</p>`,
+      actions: [{ label: 'Keep line', cls: 'quiet' }, { label: 'Remove line', cls: 'danger', run: () => { state.lines = state.lines.filter(l => l !== line); render(); } }] });
+  }
+  else if (act === 'reset') {
+    openModal({ title: 'Reset the sample?', body: '<p>This clears every change and restores the original fictional sample, including demo settings. Nothing outside this page is affected.</p>',
+      actions: [{ label: 'Cancel', cls: 'quiet' }, { label: 'Reset sample', cls: 'danger', run: () => { state = freshState(); render({ top: true }); } }] });
+  }
+  else if (act === 'settings') openSettings();
+  else if (act === 'print') window.print();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#modal-root').innerHTML) closeModal(); });
+function focusLine(id) { const el = $(`[data-line="${CSS.escape(id)}"]`); if (el) el.scrollIntoView({ block: 'center' }); const s = $(`[data-product="${CSS.escape(id)}"]`); if (s) s.focus({ preventScroll: true }); }
+
+render();
+</script>
+</body>
+</html>
